@@ -16,31 +16,65 @@
             </div>
           </div>
         </div>
+        <BatchParamEditor />
         <div class="bg-slate-800 rounded-lg p-4 border border-slate-700">
           <h3 class="text-sm font-bold text-slate-400 mb-3">参数控制</h3>
           <label class="text-xs text-slate-500">迭代次数: {{ store.iterations }}</label>
           <input type="range" min="100" max="5000" step="100" v-model.number="store.iterations" class="w-full mt-1 mb-3 accent-cyan-500" />
-          <button @click="store.runSimulation" :disabled="store.isRunning" class="w-full py-2 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 rounded text-sm font-bold">
-            {{ store.isRunning ? '运行中...' : '▶ 开始模拟' }}
+          <button @click="store.runSimulation" :disabled="store.isRunning" class="w-full py-2 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 rounded text-sm font-bold transition-all">
+            <span v-if="store.isRunning">运行中...</span>
+            <span v-else-if="store.hasChanges">▶ 应用并模拟 ({{ store.paramChanges.length }}处变更)</span>
+            <span v-else>▶ 开始模拟</span>
           </button>
         </div>
         <div v-if="store.result" class="bg-slate-800 rounded-lg p-4 border border-slate-700 text-sm">
           <h3 class="text-sm font-bold text-slate-400 mb-3">模拟结果</h3>
           <div class="space-y-2">
-            <div class="flex justify-between"><span class="text-slate-500">估算值</span><span class="text-cyan-400 font-bold font-mono">{{ store.result.estimate.toFixed(6) }}</span></div>
-            <div v-if="store.result.trueValue !== undefined" class="flex justify-between"><span class="text-slate-500">真实值</span><span class="text-green-400 font-mono">{{ store.result.trueValue.toFixed(6) }}</span></div>
-            <div v-if="store.result.error !== undefined" class="flex justify-between"><span class="text-slate-500">误差</span><span class="text-orange-400 font-mono">{{ store.result.error.toFixed(6) }}</span></div>
-            <div class="flex justify-between"><span class="text-slate-500">样本数</span><span class="text-slate-300">{{ store.result.iterations }}</span></div>
+            <div :class="['flex justify-between p-1.5 rounded transition-all', isAffected('估算值') ? 'bg-cyan-500/20 -mx-1.5' : '']">
+              <span class="text-slate-500">估算值</span>
+              <span class="text-cyan-400 font-bold font-mono flex items-center gap-1">
+                <span v-if="isAffected('估算值')" class="text-xs animate-pulse">⚡</span>
+                {{ store.result.estimate.toFixed(6) }}
+              </span>
+            </div>
+            <div v-if="store.result.trueValue !== undefined" :class="['flex justify-between p-1.5 rounded transition-all', isAffected('估算值') ? 'bg-cyan-500/20 -mx-1.5' : '']">
+              <span class="text-slate-500">真实值</span>
+              <span class="text-green-400 font-mono">{{ store.result.trueValue.toFixed(6) }}</span>
+            </div>
+            <div v-if="store.result.error !== undefined" :class="['flex justify-between p-1.5 rounded transition-all', isAffected('误差') ? 'bg-amber-500/20 -mx-1.5' : '']">
+              <span class="text-slate-500">误差</span>
+              <span class="text-orange-400 font-mono flex items-center gap-1">
+                <span v-if="isAffected('误差')" class="text-xs animate-pulse">⚡</span>
+                {{ store.result.error.toFixed(6) }}
+              </span>
+            </div>
+            <div :class="['flex justify-between p-1.5 rounded transition-all', isAffected('迭代次数') ? 'bg-cyan-500/20 -mx-1.5' : '']">
+              <span class="text-slate-500">样本数</span>
+              <span class="text-slate-300 flex items-center gap-1">
+                <span v-if="isAffected('迭代次数')" class="text-xs animate-pulse">⚡</span>
+                {{ store.result.iterations }}
+              </span>
+            </div>
           </div>
         </div>
       </div>
       <div class="lg:w-3/4 space-y-4">
-        <div class="bg-slate-800 rounded-lg p-4 border border-slate-700">
-          <h3 class="text-sm font-bold text-slate-400 mb-3">收敛过程</h3>
+        <div :class="['bg-slate-800 rounded-lg p-4 border transition-all', isAffected('收敛过程') ? 'border-cyan-500/50 shadow-lg shadow-cyan-500/10' : 'border-slate-700']">
+          <h3 class="text-sm font-bold text-slate-400 mb-3 flex items-center gap-2">
+            收敛过程
+            <span v-if="isAffected('收敛过程')" class="text-xs px-2 py-0.5 bg-cyan-500/30 text-cyan-300 rounded animate-pulse">
+              ⚡ 将受影响
+            </span>
+          </h3>
           <div ref="convergenceRef" class="w-full rounded" style="height:240px;background:#0f172a;"></div>
         </div>
-        <div class="bg-slate-800 rounded-lg p-4 border border-slate-700">
-          <h3 class="text-sm font-bold text-slate-400 mb-3">样本分布直方图</h3>
+        <div :class="['bg-slate-800 rounded-lg p-4 border transition-all', isAffected('样本分布') ? 'border-purple-500/50 shadow-lg shadow-purple-500/10' : 'border-slate-700']">
+          <h3 class="text-sm font-bold text-slate-400 mb-3 flex items-center gap-2">
+            样本分布直方图
+            <span v-if="isAffected('样本分布')" class="text-xs px-2 py-0.5 bg-purple-500/30 text-purple-300 rounded animate-pulse">
+              ⚡ 将受影响
+            </span>
+          </h3>
           <div ref="histogramRef" class="w-full rounded" style="height:220px;background:#0f172a;"></div>
         </div>
         <div class="bg-slate-800 rounded-lg p-4 border border-slate-700">
@@ -55,7 +89,7 @@
               <textarea v-model="group2Input" rows="2" class="w-full mt-1 bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:border-cyan-500 resize-none"></textarea>
             </div>
           </div>
-          <button @click="runTest" class="px-4 py-1.5 bg-purple-600 hover:bg-purple-500 rounded text-sm">执行T检验</button>
+          <button @click="runTest" class="px-4 py-1.5 bg-purple-600 hover:bg-purple-500 rounded text-sm transition-colors">执行T检验</button>
           <div v-if="store.testResult" class="mt-3 grid grid-cols-4 gap-3 text-sm">
             <div class="bg-slate-900 rounded p-2 text-center"><div class="text-xs text-slate-500 mb-1">统计量 t</div><div class="text-cyan-400 font-bold font-mono">{{ store.testResult.statistic }}</div></div>
             <div class="bg-slate-900 rounded p-2 text-center"><div class="text-xs text-slate-500 mb-1">p 值</div><div class="font-bold font-mono" :class="store.testResult.significant ? 'text-red-400' : 'text-green-400'">{{ store.testResult.pValue }}</div></div>
@@ -72,6 +106,7 @@
 import { ref, watch, onMounted } from 'vue'
 import * as echarts from 'echarts'
 import { useMCStore, SCENARIOS } from './store/mc'
+import BatchParamEditor from './components/BatchParamEditor.vue'
 
 const store = useMCStore()
 const convergenceRef = ref<HTMLDivElement | null>(null)
@@ -80,6 +115,10 @@ const group1Input = ref('5.1,4.8,5.3,4.9,5.2,5.0,4.7,5.1,5.4,4.8')
 const group2Input = ref('4.6,4.2,4.9,4.3,4.5,4.7,4.4,4.8,4.1,4.6')
 let convChart: echarts.ECharts | null = null
 let histChart: echarts.ECharts | null = null
+
+function isAffected(metric: string): boolean {
+  return store.hasChanges && store.affectedMetrics.includes(metric)
+}
 
 function initCharts() {
   if (convergenceRef.value) convChart = echarts.init(convergenceRef.value, 'dark')
